@@ -225,23 +225,23 @@ nano /etc/bind/zones/K13.com
 ```
 ubah localhostnya, nanti akan diganti seperti ini:
 ```
-$TTL 604800
-@   IN  SOA ns1.K13.com. root.K13.com. (
-        2025101301 ; Serial (format YYYYMMDDXX)
-        3600        ; Refresh (1 jam)
-        1800        ; Retry (30 menit)
-        1209600     ; Expire (2 minggu)
-        86400 )     ; Negative Cache TTL
+$TTL    604800          ; Waktu cache default (detik)
+@       IN      SOA     ns1.K13.com. root.K13.com. (
+                        2025100401      ; Serial (format YYYYMMDDXX)
+                        604800          ; Refresh (1 minggu)
+                        86400           ; Retry (1 hari)
+                        2419200         ; Expire (4 minggu)
+                        604800 )        ; Negative Cache TTL
 ;
 
-; Name Server (authoritative)
-@       IN  NS  ns1.K13.com.
-@       IN  NS  ns2.K13.com.
+@       IN      NS      ns1.K13.com.
+@       IN      NS      ns2.K13.com.
 
 ; A records
-ns1     IN  A   10.70.3.3       ; Tirion (master)
-ns2     IN  A   10.70.3.4       ; Valmar (slave)
-@       IN  A   10.70.3.2     ; Apex mengarah ke Sirion
+ns1     IN      A       10.70.3.3       ; Tirion (master)
+ns2     IN      A       10.70.3.4       ; Valmar (slave)
+@       IN      A       10.70.3.2       ; Apex mengarah ke Sirion
+
 ```
 cek di console tirion
 ```
