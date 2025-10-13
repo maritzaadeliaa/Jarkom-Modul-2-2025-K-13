@@ -1,0 +1,8 @@
+{
+    "username": "mamettdd",
+    "customer_code": "10961174A",
+    "email": "mamettdd@gmail.com",
+    "phone": "",
+    "company": "",
+    "license": "dXNlcm5hbWV8Y3VzdG9tZXJfY29kZXxlbWFpbHxwaG9uZXxjb21wYW55,jph25hkmqoeIfeBG0FMuHRakc4VLMSU8uhtZPG72NxhVb3OqRp8gatza8uo18Pp6D4HJxe+FyJeSKI0HFn3JnKf2eqSqY5hdMNCKNgPtqFH7pa1YDXdSU1kklLn13r2yqHyM/Zo/ZPEj11ByCirTfHh0nD9+cMVBl5YO8eSrkGQ="
+}
