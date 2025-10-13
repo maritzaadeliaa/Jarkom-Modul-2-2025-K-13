@@ -917,6 +917,251 @@ isinya:
 </VirtualHost>
 ```
 
+Soal 11
+Di muara sungai, Sirion berdiri sebagai reverse proxy. Terapkan path-based routing: /static → Lindon dan /app → Vingilot, sambil meneruskan header Host dan X-Real-IP ke backend. Pastikan Sirion menerima www.<xxxx>.com (kanonik) dan sirion.<xxxx>.com, dan bahwa konten pada /static dan /app di-serve melalui backend yang tepat.
+
+`
+sudo nano /etc/nginx/sites-available/sirion.k13.conf
+`
+
+membuat konfigurasi baru dan isi denagn konfigurasi berikut
+
+```
+server {
+    listen 80 default_server;
+    server_name sirion.k13.com www.k13.com havens.k13.com;
+
+    # Reverse proxy rules
+    location /static/ {
+        proxy_pass http://10.70.3.5/;            # Lindon
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    }
+
+    location /app/ {
+        proxy_pass http://10.70.3.6/;            # Vingilot
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # /admin (akan ditambahkan di nomor 12)
+    
+    # Root homepage (nomor 20)
+    location = / {
+        root /var/www/sirion;
+        index index.html;
+    }
+}
+```
+
+uji sintaks menggunakan
+
+`
+sudo nginx -t
+`
+
+Soal 12
+Ada kamar kecil di balik gerbang yakni /admin. Lindungi path tersebut di Sirion menggunakan Basic Auth, akses tanpa kredensial harus ditolak dan akses dengan kredensial yang benar harus diizinkan.
+
+membuat password file di sirion
+
+`
+apt-get install -y apache2-utils   
+htpasswd -c /etc/nginx/.htpasswd admin
+chmod 640 /etc/nginx/.htpasswd
+chown root:www-data /etc/nginx/.htpasswd
+`
+
+lalu tambahkan blok di server config tepatnya di atas _/location/_
+
+```
+location /admin {
+    auth_basic "Restricted Admin";
+    auth_basic_user_file /etc/nginx/.htpasswd;
+
+    proxy_pass http://10.70.3.6/admin;   # atau lokasi admin di backend
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+}
+```
+
+Soal 13
+“Panggil aku dengan nama,” ujar Sirion kepada mereka yang datang hanya menyebut angka. Kanonisasikan endpoint, akses melalui IP address Sirion maupun sirion.<xxxx>.com harus redirect 301 ke www.<xxxx>.com sebagai hostname kanonik.
+
+Di Sirion Nginx, tambahkan server block yang menangkap akses lewat IP atau sirion.k13.com dan redirect 301 ke www.k13.com
+
+```
+# redirect server (catch IP and sirion.k13.com)
+server {
+    listen 80;
+    server_name 10.70.3.2 sirion.k13.com;
+
+    return 301 http://www.k13.com$request_uri;
+}
+```
+
+Soal 14
+Di Vingilot, catatan kedatangan harus jujur. Pastikan access log aplikasi di Vingilot mencatat IP address klien asli saat lalu lintas melewati Sirion (bukan IP Sirion).
+
+setelah mengirim X-Real-IP di sirion, harus dipastikan aplikasi/Apache/NGINX di Vingilot membaca header itu dan menuliskannya ke access log.
+ontoh konfigurasi Nginx agar $remote_addr benar-benar klien asli — jika Vingilot menerima koneksi langsung dari sirion, gunakan set_real_ip_from + real_ip_header
+
+Di /etc/nginx/nginx.conf di Vingilot
+
+```
+# trust Sirion IP
+set_real_ip_from 10.70.3.2;
+real_ip_header X-Real-IP;
+```
+
+lalu
+
+```
+log_format main '$remote_addr - $remote_user [$time_local] "$request" '
+                '$status $body_bytes_sent "$http_referer" "$http_user_agent"';
+access_log /var/log/nginx/access.log main;
+```
+berfungsi untuk mencatat dengan cara format log
+
+
+Jika aplikasi PHP (fpm) membaca $_SERVER['REMOTE_ADDR'], dengan pengaturan di atas REMOTE_ADDR akan jadi IP client asli.
+
+Soal 15
+Pelabuhan diuji gelombang kecil, salah satu klien yakni Elrond menjadi penguji dan menggunakan ApacheBench (ab) untuk membombardir http://www.<xxxx>.com/app/ dan http://www.<xxxx>.com/static/ melalui hostname kanonik. Untuk setiap endpoint lakukan 500 request dengan concurrency 10, dan rangkum hasil dalam tabel ringkas.
+
+run dari erlond
+
+`
+ab -n 500 -c 10 http://www.k13.com/app/
+ab -n 500 -c 10 http://www.k13.com/static/
+`
+
+yang nantinya akan mengumpulkan request completed, time taken to test, request/second, time/request, transfer rate, dan failed requests (jika ada)
+
+`
+ab -n 500 -c 10 http://www.k13.com/app/ > /root/ab_app.txt
+ab -n 500 -c 10 http://www.k13.com/static/ > /root/ab_static.txt
+`
+
+Simpan output ab ke file
+
+Soal 16
+Badai mengubah garis pantai. Ubah A record lindon.<xxxx>.com ke alamat baru (ubah IP paling belakangnya saja agar mudah), naikkan SOA serial di Tirion (ns1) dan pastikan Valmar (ns2) tersinkron, karena static.<xxxx>.com adalah CNAME → lindon.<xxxx>.com, seluruh akses ke static.<xxxx>.com mengikuti alamat baru, tetapkan TTL = 30 detik untuk record yang relevan dan verifikasi tiga momen yakni sebelum perubahan (mengembalikan alamat lama), sesaat setelah perubahan namun sebelum TTL kedaluwarsa (masih alamat lama karena cache), dan setelah TTL kedaluwarsa (beralih ke alamat baru).
+
+di tirion, edit /etc/bind/zones/K13.com
+
+`
+lindon 30 IN A 10.70.3.55
+`
+
+di valmar
+
+`
+dig @10.70.3.3 K13.com SOA +short
+dig @10.70.3.4 K13.com SOA +short
+`
+
+untuk memastikan zone transfer berjalan (serial harus sama)
+
+```
+dig @10.70.3.3 lindon.k13.com +short
+dig @10.70.3.3 static.k13.com +short
+
+dig lindon.k13.com +short
+dig static.k13.com +short
+
+sleep 35
+dig lindon.k13.com +short
+dig static.k13.com +short
+```
+
+1. Sebelum perubahan — dig static.k13.com +short → old IP (via CNAME → lindon).
+2. Sesaat setelah perubahan (tetapi sebelum TTL kedaluwarsa) — dig static.k13.com +short → masih old IP (cached).
+3. Setelah TTL (30s) kedaluwarsa — dig static.k13.com +short → new IP.
+
+   
+Soal 17
+Andaikata bumi bergetar dan semua tertidur sejenak, mereka harus bangkit sendiri. Pastikan layanan inti bind9 di ns1/ns2, nginx di Sirion/Lindon, dan PHP-FPM di Vingilot autostart saat reboot, lalu verifikasi layanan kembali menjawab sesuai fungsinya.
+
+di tirion dan valmar
+
+```
+systemctl enable bind9
+systemctl start bind9
+systemctl status bind9
+```
+berfungsi agar domain dapat di-resolve melalui DNS internal.
+
+
+di sirion dan lindon
+
+```
+systemctl enable nginx
+systemctl start nginx
+systemctl status nginx
+```
+ memastikan semua server web aktif dan siap menerima request dari domain yang diarahkan DNS.
+
+ 
+di vingilot
+
+```
+systemctl enable php8.4-fpm
+systemctl start php8.4-fpm
+systemctl status php8.4-fpm
+```
+
+berfungsi agar Nginx di Vingilot bisa melayani file .php melalui FastCGI socket (/run/php/php8.4-fpm.sock).
+
+`
+#!/bin/bash
+for svc in bind9 nginx php8.4-fpm; do
+  echo "=== $svc ==="
+  systemctl is-active $svc || true
+done
+`
+
+menambahkan skrip verifikasi singkat /root/check_services.sh
+
+
+Soal 18
+Sang musuh memiliki banyak nama. Tambahkan melkor.<xxxx>.com sebagai record TXT berisi “Morgoth (Melkor)” dan tambahkan morgoth.<xxxx>.com sebagai CNAME → melkor.<xxxx>.com, verifikasi query TXT terhadap melkor dan bahwa query ke morgoth mengikuti aliasnya.
+
+edit /etc/bind/zones/K13.com di Tirion
+
+`
+melkor   IN TXT "Morgoth (Melkor)"
+morgoth  IN CNAME melkor.K13.com.
+`
+
+berfungsi untuk menaikkan SOA serial, named-checkzone K13.com /etc/bind/zones/K13.com, restart bind, dan memastikan Valmar menerima file di /var/cache/bind).
+
+
+verifikasi menggunakan
+
+`
+dig @10.70.3.3 melkor.k13.com TXT +short
+dig @10.70.3.3 morgoth.k13.com CNAME +short
+dig morgoth.k13.com +short         # Should resolve via CNAME to melkor (but TXT only on melkor)
+`
+
+
+Soal 19
+Pelabuhan diperluas bagi para pelaut. Tambahkan havens.<xxxx>.com sebagai CNAME → www.<xxxx>.com, lalu akses layanan melalui hostname tersebut dari dua klien berbeda untuk memastikan resolusi dan rute aplikasi berfungsi.
+
+di Tirion /etc/bind/zones/K13.com
+
+`
+havens  IN CNAME www.K13.com.
+`
+
+lalu verifikasi 
+
+
+
 10.	Vingilot mengisahkan cerita dinamis. Jalankan web dinamis (PHP-FPM) pada hostname app.<xxxx>.com dengan beranda dan halaman about, serta terapkan rewrite sehingga /about berfungsi tanpa akhiran .php. Akses harus dilakukan melalui hostname.
 
 Soal 11 - 20
