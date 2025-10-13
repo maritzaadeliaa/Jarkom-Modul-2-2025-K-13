@@ -1,0 +1,3 @@
+dig @10.70.3.3 melkor.k13.com TXT +short
+dig @10.70.3.3 morgoth.k13.com CNAME +short
+dig morgoth.k13.com +short        
