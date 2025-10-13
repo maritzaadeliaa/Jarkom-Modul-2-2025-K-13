@@ -274,17 +274,36 @@ nano /etc/bind/named.conf.options
 isi:
 ```
 options {
-    directory "/var/cache/bind";
-    recursion yes;
-    allow-query { any; };
-    forwarders { 192.168.122.1; };
-    dnssec-validation auto;
-    auth-nxdomain no;
-    listen-on-v6 { any; };
+        directory "/var/cache/bind";
+
+        listen-on { any; };
+        listen-on-v6 { any; };
+
+        allow-query { any; };
+        recursion yes;
+
+        forwarders { 192.168.122.1; };
+        forward only;
+
+        dnssec-validation no;
+
+        auth-nxdomain no;
 };
+```
+Lalu validasi & jalankan:
+```
+named-checkconf
+named -g -c /etc/bind/named.conf
+pkill named 2>/dev/null || true # pastikan tidak ada proses lama
+named -c /etc/bind/named.conf & # start di background
+```
+Tes dari Valmar (ns2)
+```
+dig @127.0.0.1 K13.com +noall +answer +aa
+dig @10.70.3.4 K13.com +noall +answer +aa
+dig @10.70.3.4 -x 10.70.3.2 +noall +answer +aa
 
 ```
-
 ```
 nano /etc/bind/named.conf.local 
 ```
@@ -292,8 +311,9 @@ isi:
 ```
 zone "K13.com" {
     type slave;
-    masters { 10.70.3.3; };           // Tirion (ns1)
     file "/var/cache/bind/K13.com";    // copy zona di ns2
+    masters { 10.70.3.3; };           // Tirion (ns1)
+    allow-notify { 10.70.3.3; };
 };
 
 ```
@@ -301,11 +321,12 @@ di Tirion:
 ```
 service bind9 restart || (pkill named 2>/dev/null || true; named -c /etc/bind/named.conf)
 ```
+di Valmar:
 ```
 pkill named 2>/dev/null || true
 named -c /etc/bind/named.conf
 ```
-di Valmar:
+Lalu jalankan:
 ```
 ls /var/cache/bind/ | grep K13.com
 dig @127.0.0.1 K13.com +noall +answer +aa
@@ -681,7 +702,7 @@ ping -c3 elrond.K13.com
 
 6.	Lonceng Valmar berdentang mengikuti irama Tirion. Pastikan zone transfer berjalan, Pastikan Valmar (ns2) telah menerima salinan zona terbaru dari Tirion (ns1). Nilai serial SOA di keduanya harus sama
 
-cek apakah zone transfer berhasil:
+di Valmar cek apakah zone transfer berhasil:
 ```
 ls /var/cache/bind/
 ```
