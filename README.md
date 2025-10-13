@@ -838,10 +838,80 @@ zone "3.70.10.in-addr.arpa" {
 ```
 Reload BIND
 ```
+pkill named 2>/dev/null || true
+named -c /etc/bind/named.conf
+```
+Cek zone transfer di Valmar
+```
+ls -l /var/cache/bind/ # harus ada: K13.com  dan  db.10.70.3 
+```
+Tes query di Valmar
+```
+dig -4 @127.0.0.1 K13.com SOA +noall +answer +aa
+dig -4 @127.0.0.1 sirion.K13.com +short
+dig -4 @127.0.0.1 -x 10.70.3.2 +short
+```
+Tes dari klien lain (Earendil / Elwing)
+```
+dig K13.com +short
+dig sirion.K13.com +short
+dig static.K13.com +short
+dig app.K13.com +short
+dig -x 10.70.3.2 +short
+dig -x 10.70.3.5 +short
+dig -x 10.70.3.6 +short
+```
+Cek sinkronisasi serial
 
+pastikan nilai Serial SOA di Tirion dan Valmar sama:
+```
+dig -4 @10.70.3.3 K13.com SOA +short
+dig -4 @10.70.3.4 K13.com SOA +short
 ```
 
 9.	Lampion Lindon dinyalakan. Jalankan web statis pada hostname static.<xxxx>.com dan buka folder arsip /annals/ dengan autoindex (directory listing) sehingga isinya dapat ditelusuri. Akses harus dilakukan melalui hostname, bukan IP.
+
+### Lindon
+
+install Apache2
+```
+apt-get update
+apt-get install apache2 -y
+
+```
+Buat folder untuk web statis
+```
+mkdir -p /var/www/static.K13.com/annals
+```
+Isi folder /annals/ dengan file dummy (buat testing dulu):
+```
+echo "<h2>Arsip Sejarah Lindon</h2>" > /var/www/static.K13.com/annals/index.html
+echo "catatan1.txt" > /var/www/static.K13.com/annals/catatan1.txt
+echo "catatan2.txt" > /var/www/static.K13.com/annals/catatan2.txt
+```
+Buat konfigurasi Virtual Host
+```
+nano /etc/apache2/sites-available/static.K13.com.conf
+```
+isinya:
+```
+<VirtualHost *:80>
+    ServerAdmin webmaster@K13.com
+    ServerName static.K13.com
+    ServerAlias www.static.K13.com
+
+    DocumentRoot /var/www/static.K13.com
+
+    <Directory /var/www/static.K13.com/annals>
+        Options +Indexes
+        AllowOverride All
+        Require all granted
+    </Directory>
+
+    ErrorLog ${APACHE_LOG_DIR}/static_error.log
+    CustomLog ${APACHE_LOG_DIR}/static_access.log combined
+</VirtualHost>
+```
 
 10.	Vingilot mengisahkan cerita dinamis. Jalankan web dinamis (PHP-FPM) pada hostname app.<xxxx>.com dengan beranda dan halaman about, serta terapkan rewrite sehingga /about berfungsi tanpa akhiran .php. Akses harus dilakukan melalui hostname.
 
