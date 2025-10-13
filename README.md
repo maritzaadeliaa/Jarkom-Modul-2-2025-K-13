@@ -686,3 +686,76 @@ Contoh Outputnya:
 ```
 K13.com.                604800  IN      SOA     ns1.K13.com. root.K13.com. 2025100401 604800 86400 2419200 604800
 ```
+
+7.	Peta kota dan pelabuhan dilukis. Sirion sebagai gerbang, Lindon sebagai web statis, Vingilot sebagai web dinamis. Tambahkan pada zona <xxxx>.com A record untuk sirion.<xxxx>.com (IP Sirion), lindon.<xxxx>.com (IP Lindon), dan vingilot.<xxxx>.com (IP Vingilot). Tetapkan CNAME :
+-	www.<xxxx>.com → sirion.<xxxx>.com, 
+-	static.<xxxx>.com → lindon.<xxxx>.com, dan 
+-	app.<xxxx>.com → vingilot.<xxxx>.com. 
+Verifikasi dari dua klien berbeda bahwa seluruh hostname tersebut ter-resolve ke tujuan yang benar dan konsisten.
+
+Tirion:
+```
+nano /etc/bind/zones/K13.com
+```
+Tambahkan bagian berikut di bawah A records:
+```
+; A records
+ns1     IN A 10.70.3.3       ; Tirion (master)
+ns2     IN A 10.70.3.4       ; Valmar (slave)
+@       IN A 10.70.3.2       ; Apex mengarah ke Sirion
+
+; Tambahan untuk web & gateway
+sirion  IN A 10.70.3.2       ; Sirion (gateway / gerbang)
+lindon  IN A 10.70.3.5       ; Lindon (web statis)
+vingilot IN A 10.70.3.6      ; Vingilot (web dinamis)
+
+; CNAME (alias)
+www     IN CNAME sirion.K13.com.
+static  IN CNAME lindon.K13.com.
+app     IN CNAME vingilot.K13.com.
+
+```
+Naikkan 1 angka terakhir di baris serial SOA:
+```2025100401  →  2025100402```
+
+Restart Bind di Tirion dan Valmar
+```
+pkill named 2>/dev/null || true
+named -c /etc/bind/named.conf
+```
+Lalu cek apakah file zona sudah ditransfer ulang di Valmar:
+```
+ls /var/cache/bind/
+```
+
+Verifikasi dari dua klien berbeda
+misal Eardil dan Elwing
+```
+dig sirion.K13.com +short
+dig lindon.K13.com +short
+dig vingilot.K13.com +short
+
+dig www.K13.com +short
+dig static.K13.com +short
+dig app.K13.com +short
+```
+
+Outputnya:
+```
+10.70.3.2
+10.70.3.5
+10.70.3.6
+sirion.K13.com.
+10.70.3.2
+lindon.K13.com.
+10.70.3.5
+vingilot.K13.com.
+10.70.3.6
+```
+
+8.	Setiap jejak harus bisa diikuti. Di Tirion (ns1) deklarasikan satu reverse zone untuk segmen DMZ tempat Sirion, Lindon, Vingilot berada. Di Valmar (ns2) tarik reverse zone tersebut sebagai slave, isi PTR untuk ketiga hostname itu agar pencarian balik IP address mengembalikan hostname yang benar, lalu pastikan query reverse untuk alamat Sirion, Lindon, Vingilot dijawab authoritative.
+
+9.	Lampion Lindon dinyalakan. Jalankan web statis pada hostname static.<xxxx>.com dan buka folder arsip /annals/ dengan autoindex (directory listing) sehingga isinya dapat ditelusuri. Akses harus dilakukan melalui hostname, bukan IP.
+
+10.	Vingilot mengisahkan cerita dinamis. Jalankan web dinamis (PHP-FPM) pada hostname app.<xxxx>.com dengan beranda dan halaman about, serta terapkan rewrite sehingga /about berfungsi tanpa akhiran .php. Akses harus dilakukan melalui hostname.
+
