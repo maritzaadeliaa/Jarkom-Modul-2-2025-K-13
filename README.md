@@ -669,3 +669,20 @@ ping -c3 sirion.K13.com
 ping -c3 elrond.K13.com
 
 ```
+
+6.	Lonceng Valmar berdentang mengikuti irama Tirion. Pastikan zone transfer berjalan, Pastikan Valmar (ns2) telah menerima salinan zona terbaru dari Tirion (ns1). Nilai serial SOA di keduanya harus sama
+
+cek apakah zone transfer berhasil:
+```
+ls /var/cache/bind/
+```
+harus muncul ```file K13.com```
+
+lalu cek serial-nya di Tirion dan Valmar:
+```
+dig @127.0.0.1 K13.com SOA +noall +answer
+```
+Contoh Outputnya:
+```
+K13.com.                604800  IN      SOA     ns1.K13.com. root.K13.com. 2025100401 604800 86400 2419200 604800
+```
