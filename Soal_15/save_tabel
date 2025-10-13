@@ -1,0 +1,1 @@
+ab -n 500 -c 10 http://www.k13.com/app/ > /root/ab_app.txt ab -n 500 -c 10 http://www.k13.com/static/ > /root/ab_static.txt
