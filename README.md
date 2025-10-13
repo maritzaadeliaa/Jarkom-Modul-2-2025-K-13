@@ -1,7 +1,11 @@
 # Jarkom-Modul-2-2025-K-13
 
-Soal 1
+| Nama                   | NRP        |
+|-------------------------|------------|
+| Ahmad Rabbani Fata     | 5027241046 |
+| Maritza Adelia Sucipto | 5027241111 |
 
+Soal 1 - 10
 1.	Di tepi Beleriand yang porak-poranda, Eonwe merentangkan tiga jalur: Barat untuk Earendil dan Elwing, Timur untuk Círdan, Elrond, Maglor, serta pelabuhan DMZ bagi Sirion, Tirion, Valmar, Lindon, Vingilot. Tetapkan alamat dan default gateway tiap tokoh sesuai glosarium yang sudah diberikan.
 ```
 Eonwe:
@@ -915,3 +919,4 @@ isinya:
 
 10.	Vingilot mengisahkan cerita dinamis. Jalankan web dinamis (PHP-FPM) pada hostname app.<xxxx>.com dengan beranda dan halaman about, serta terapkan rewrite sehingga /about berfungsi tanpa akhiran .php. Akses harus dilakukan melalui hostname.
 
+Soal 11 - 20
