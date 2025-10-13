@@ -7,7 +7,7 @@
 
 Soal 1 - 10
 1.	Di tepi Beleriand yang porak-poranda, Eonwe merentangkan tiga jalur: Barat untuk Earendil dan Elwing, Timur untuk Círdan, Elrond, Maglor, serta pelabuhan DMZ bagi Sirion, Tirion, Valmar, Lindon, Vingilot. Tetapkan alamat dan default gateway tiap tokoh sesuai glosarium yang sudah diberikan.
-```
+```bash
 Eonwe:
 
 auto eth0
@@ -111,7 +111,7 @@ gateway 10.70.3.1
 
 2. Angin dari luar mulai berhembus ketika Eonwe membuka jalan ke awan NAT. Pastikan jalur WAN di router aktif dan NAT meneruskan trafik keluar bagi seluruh alamat internal sehingga host di dalam dapat mencapai layanan di luar menggunakan IP address.
 di Eonwe:
-```
+```bash
 apt update && apt install -y iptables
 ```
 ```
@@ -122,7 +122,7 @@ cat /etc/resolv.conf
 ```
 
 di semua node selain router:
-```
+```bash
 echo nameserver 192.168.122.1 > /etc/resolv.conf
 ```
 ```
@@ -131,12 +131,12 @@ ping google.com
 
 3.	Kabar dari Barat menyapa Timur. Pastikan kelima klien dapat saling berkomunikasi lintas jalur (routing internal via Eonwe berfungsi), lalu pastikan setiap host non-router menambahkan resolver 192.168.122.1 saat interfacenya aktif agar akses paket dari internet tersedia sejak awal.
 
-```
+```bash
 nano /root/.bashrc
 ```
 
 isinya:
-```
+```bash
 # ~/.bashrc: executed by bash(1) for non-login shells.
 
 # Note: PS1 is set in /etc/profile, and the default umask is defined in /etc/login.defs. You should not need this unless you want different defaults
@@ -175,7 +175,7 @@ echo nameserver 192.168.122.1 > /etc/resolv.conf
 4.	Para penjaga nama naik ke menara, di Tirion (ns1/master) bangun zona <xxxx>.com sebagai authoritative dengan SOA yang menunjuk ke ns1.<xxxx>.com dan catatan NS untuk ns1.<xxxx>.com dan ns2.<xxxx>.com. Buat A record untuk ns1.<xxxx>.com dan ns2.<xxxx>.com yang mengarah ke alamat Tirion dan Valmar sesuai glosarium, serta A record apex <xxxx>.com yang mengarah ke alamat Sirion (front door), aktifkan notify dan allow-transfer ke Valmar, set forwarders ke 192.168.122.1. Di Valmar (ns2/slave) tarik zona <xxxx>.com dari Tirion dan pastikan menjawab authoritative. pada seluruh host non-router ubah urutan resolver menjadi IP dari ns1.<xxxx>.com → ns2.<xxxx>.com → 192.168.122.1. Verifikasi query ke apex dan hostname layanan dalam zona dijawab melalui ns1/ns2.
 
 ### Tirion:
-```
+```bash
 apt-get update
 apt-get install bind9 -y
 ```
@@ -188,7 +188,7 @@ ln -s /etc/init.d/named /etc/init.d/bind9
 nano /etc/bind/named.conf.local
 ```
 Isinya:
-```
+```bash
 zone "K13.com" {
         type master;
         file "/etc/bind/zones/K13.com";
@@ -206,7 +206,7 @@ mkdir /etc/bind/zones
 nano /etc/bind/zone.template
 ```
 isinya:
-```
+```bash
 $TTL    604800          ; Waktu cache default (detik)
 @       IN      SOA     localhost. root.localhost. (
                         2025100401 ; Serial (format YYYYMMDDXX)
@@ -220,7 +220,7 @@ $TTL    604800          ; Waktu cache default (detik)
 @       IN      A       127.0.0.1
 ```
 
-```
+```bash
 cp /etc/bind/zone.template /etc/bind/zones/K13.com
 ```
 
@@ -228,7 +228,7 @@ cp /etc/bind/zone.template /etc/bind/zones/K13.com
 nano /etc/bind/zones/K13.com
 ```
 ubah localhostnya, nanti akan diganti seperti ini:
-```
+```bash
 $TTL    604800          ; Waktu cache default (detik)
 @       IN      SOA     ns1.K13.com. root.K13.com. (
                         2025100401      ; Serial (format YYYYMMDDXX)
@@ -258,7 +258,7 @@ named-checkzone K13.com /etc/bind/zones/K13.com
 ```
 
 seharusnya akan mengeluarkan output:
-```
+```bash
 zone K13.com/IN: loaded serial 2025100401
 OK
 ```
@@ -267,7 +267,7 @@ OK
 
 ### Valmar:
 
-```
+```bash
 apt-get update
 apt-get install -y bind9 bind9utils dnsutils
 ```
@@ -276,7 +276,7 @@ nano /etc/bind/named.conf.options
 ```
 
 isi:
-```
+```bash
 options {
         directory "/var/cache/bind";
 
@@ -295,14 +295,14 @@ options {
 };
 ```
 Lalu validasi & jalankan:
-```
+```bash
 named-checkconf
 named -g -c /etc/bind/named.conf
 pkill named 2>/dev/null || true # pastikan tidak ada proses lama
 named -c /etc/bind/named.conf & # start di background
 ```
 Tes dari Valmar (ns2)
-```
+```bash
 dig @127.0.0.1 K13.com +noall +answer +aa
 dig @10.70.3.4 K13.com +noall +answer +aa
 dig @10.70.3.4 -x 10.70.3.2 +noall +answer +aa
@@ -312,7 +312,7 @@ dig @10.70.3.4 -x 10.70.3.2 +noall +answer +aa
 nano /etc/bind/named.conf.local 
 ```
 isi:
-```
+```bash
 zone "K13.com" {
     type slave;
     file "/var/cache/bind/K13.com";    // copy zona di ns2
@@ -322,16 +322,16 @@ zone "K13.com" {
 
 ```
 di Tirion:
-```
+```bash
 service bind9 restart || (pkill named 2>/dev/null || true; named -c /etc/bind/named.conf)
 ```
 di Valmar:
-```
+```bash
 pkill named 2>/dev/null || true
 named -c /etc/bind/named.conf
 ```
 Lalu jalankan:
-```
+```bash
 ls /var/cache/bind/ | grep K13.com
 dig @127.0.0.1 K13.com +noall +answer +aa
 ```
@@ -343,7 +343,7 @@ K13.com.                604800  IN      A       10.70.3.2
 
 ### Ke semua client non router
 
-```
+```bash
 echo "nameserver 10.70.3.3" > /etc/resolv.conf
 echo "nameserver 10.70.3.4" >> /etc/resolv.conf
 echo "nameserver 192.168.122.1" >> /etc/resolv.conf
@@ -369,14 +369,14 @@ nano /root/setup_node.sh
 isi file sesuai dengan nodenya
 
 Jalankan:
-```
+```bash
 chmod +x /root/setup_node.sh
 bash /root/setup_node.sh
 
 ```
 isi file untuk tiap node
 Eonwe:
-```
+```bash
 #!/bin/bash
 HOSTNAME="eonwe"
 IPADDR="10.70.2.4"
@@ -416,7 +416,7 @@ echo "Hostname sekarang: $(hostname)"
 
 ```
 Earendil:
-```
+```bash
 #!/bin/bash
 HOSTNAME="earendil"
 IPADDR="10.70.1.2"
@@ -451,7 +451,7 @@ hostname
 ```
 
 Elwing:
-```
+```bash
 #!/bin/bash
 HOSTNAME="elwing"
 IPADDR="10.70.1.3"
@@ -486,7 +486,7 @@ hostname
 
 ```
 Sirion:
-```
+```bash
 #!/bin/bash
 HOSTNAME="sirion"
 IPADDR="10.70.3.2"
@@ -522,7 +522,7 @@ hostname
 ```
 
 Cirdan:
-```
+```bash
 #!/bin/bash
 HOSTNAME="cirdan"
 IPADDR="10.70.2.2"
@@ -558,7 +558,7 @@ hostname
 ```
 
 Elrond:
-```
+```bash
 #!/bin/bash
 HOSTNAME="elrond"
 IPADDR="10.70.2.3"
@@ -593,7 +593,7 @@ hostname
 
 ```
 Maglor
-```
+```bash
 #!/bin/bash
 HOSTNAME="maglor"
 IPADDR="10.70.2.4"
@@ -627,7 +627,7 @@ echo "Selesai konfigurasi untuk $HOSTNAME.$DOMAIN"
 hostname
 ```
 Lindon:
-```
+```bash
 #!/bin/bash
 HOSTNAME="lindon"
 IPADDR="10.70.3.5"
@@ -662,7 +662,7 @@ hostname
 
 ```
 Vingilot
-```
+```bash
 #!/bin/bash
 HOSTNAME="vingilot"
 IPADDR="10.70.3.6"
@@ -697,7 +697,7 @@ hostname
 
 ```
 Setelah semua jalanin, tes:
-```
+```bash
 ping -c3 ns1.K13.com
 ping -c3 sirion.K13.com
 ping -c3 elrond.K13.com
@@ -732,7 +732,7 @@ Tirion:
 nano /etc/bind/zones/K13.com
 ```
 Tambahkan bagian berikut di bawah A records:
-```
+```bash
 ; A records
 ns1     IN A 10.70.3.3       ; Tirion (master)
 ns2     IN A 10.70.3.4       ; Valmar (slave)
@@ -753,7 +753,7 @@ Naikkan 1 angka terakhir di baris serial SOA:
 ```2025100401  →  2025100402```
 
 Restart Bind di Tirion dan Valmar
-```
+```bash
 pkill named 2>/dev/null || true
 named -c /etc/bind/named.conf
 ```
@@ -764,7 +764,7 @@ ls /var/cache/bind/
 
 Verifikasi dari dua klien berbeda
 misal Eardil dan Elwing
-```
+```bash
 dig sirion.K13.com +short
 dig lindon.K13.com +short
 dig vingilot.K13.com +short
@@ -792,7 +792,7 @@ vingilot.K13.com.
 ### Konfigurasi di Tirion (ns1 / master)
 Deklarasi reverse zone di /etc/bind/named.conf.local
 Tambahkan di bawah zona K13.com:
-```
+```bash
 zone "3.70.10.in-addr.arpa" {
     type master;
     file "/etc/bind/zones/db.3.70.10";
@@ -803,7 +803,7 @@ zone "3.70.10.in-addr.arpa" {
 ```
 
 lalu Buat file zona reverse /etc/bind/zones/db.3.70.10
-```
+```bash
 $TTL 604800
 @   IN  SOA ns1.K13.com. root.K13.com. (
         2025101301 ; Serial
@@ -825,14 +825,14 @@ $TTL 604800
 4   IN  PTR  ns2.K13.com.
 ```
 Cek & reload BIND
-```
+```bash
 named-checkzone 3.70.10.in-addr.arpa /etc/bind/zones/db.3.70.10
 service bind9 restart
 service bind9 status
 ```
 ### Konfigurasi di Valmar (ns2 / slave)
 Tambahkan zona slave di /etc/bind/named.conf.local
-```
+```bash
 zone "3.70.10.in-addr.arpa" {
     type slave;
     file "/var/cache/bind/db.3.70.10";
@@ -846,7 +846,7 @@ pkill named 2>/dev/null || true
 named -c /etc/bind/named.conf
 ```
 Cek zone transfer di Valmar
-```
+```bash
 ls -l /var/cache/bind/ # harus ada: K13.com  dan  db.10.70.3 
 ```
 Tes query di Valmar
@@ -888,7 +888,7 @@ Buat folder untuk web statis
 mkdir -p /var/www/static.K13.com/annals
 ```
 Isi folder /annals/ dengan file dummy (buat testing dulu):
-```
+```bash
 echo "<h2>Arsip Sejarah Lindon</h2>" > /var/www/static.K13.com/annals/index.html
 echo "catatan1.txt" > /var/www/static.K13.com/annals/catatan1.txt
 echo "catatan2.txt" > /var/www/static.K13.com/annals/catatan2.txt
@@ -898,7 +898,7 @@ Buat konfigurasi Virtual Host
 nano /etc/apache2/sites-available/static.K13.com.conf
 ```
 isinya:
-```
+```bash
 <VirtualHost *:80>
     ServerAdmin webmaster@K13.com
     ServerName static.K13.com
