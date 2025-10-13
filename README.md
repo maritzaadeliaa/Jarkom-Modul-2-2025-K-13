@@ -245,6 +245,11 @@ ns2     IN      A       10.70.3.4       ; Valmar (slave)
 ```
 cek di console tirion
 ```
+named-checkconf
+```
+
+lalu jalankan:
+```
 named-checkzone K13.com /etc/bind/zones/K13.com 
 ```
 
@@ -254,7 +259,9 @@ zone K13.com/IN: loaded serial 2025100401
 OK
 ```
 
-### Vamar:
+
+
+### Valmar:
 
 ```
 apt-get update
@@ -290,12 +297,15 @@ zone "K13.com" {
 };
 
 ```
-
+di Tirion:
+```
+service bind9 restart || (pkill named 2>/dev/null || true; named -c /etc/bind/named.conf)
+```
 ```
 pkill named 2>/dev/null || true
 named -c /etc/bind/named.conf
 ```
-
+di Valmar:
 ```
 ls /var/cache/bind/ | grep K13.com
 dig @127.0.0.1 K13.com +noall +answer +aa
