@@ -764,6 +764,62 @@ vingilot.K13.com.
 
 8.	Setiap jejak harus bisa diikuti. Di Tirion (ns1) deklarasikan satu reverse zone untuk segmen DMZ tempat Sirion, Lindon, Vingilot berada. Di Valmar (ns2) tarik reverse zone tersebut sebagai slave, isi PTR untuk ketiga hostname itu agar pencarian balik IP address mengembalikan hostname yang benar, lalu pastikan query reverse untuk alamat Sirion, Lindon, Vingilot dijawab authoritative.
 
+### Konfigurasi di Tirion (ns1 / master)
+Deklarasi reverse zone di /etc/bind/named.conf.local
+Tambahkan di bawah zona K13.com:
+```
+zone "3.70.10.in-addr.arpa" {
+    type master;
+    file "/etc/bind/zones/db.3.70.10";
+    notify yes;
+    also-notify { 10.70.3.4; };
+    allow-transfer { 10.70.3.4; };
+};
+```
+
+lalu Buat file zona reverse /etc/bind/zones/db.3.70.10
+```
+$TTL 604800
+@   IN  SOA ns1.K13.com. root.K13.com. (
+        2025101301 ; Serial
+        3600       ; Refresh
+        1800       ; Retry
+        1209600    ; Expire
+        86400 )    ; Negative Cache TTL
+;
+
+; Name Servers
+@       IN  NS  ns1.K13.com.
+@       IN  NS  ns2.K13.com.
+
+; PTR Records
+2   IN  PTR  Sirion.K13.com.
+5   IN  PTR  Lindon.K13.com.
+6   IN  PTR  Vingilot.K13.com.
+3   IN  PTR  ns1.K13.com.
+4   IN  PTR  ns2.K13.com.
+```
+Cek & reload BIND
+```
+named-checkzone 3.70.10.in-addr.arpa /etc/bind/zones/db.3.70.10
+service bind9 restart
+service bind9 status
+```
+### Konfigurasi di Valmar (ns2 / slave)
+Tambahkan zona slave di /etc/bind/named.conf.local
+```
+zone "3.70.10.in-addr.arpa" {
+    type slave;
+    file "/var/cache/bind/db.3.70.10";
+    masters { 10.70.3.3; };
+    allow-notify { 10.70.3.3; };
+};
+```
+Reload BIND
+```
+
+```
+
 9.	Lampion Lindon dinyalakan. Jalankan web statis pada hostname static.<xxxx>.com dan buka folder arsip /annals/ dengan autoindex (directory listing) sehingga isinya dapat ditelusuri. Akses harus dilakukan melalui hostname, bukan IP.
 
 10.	Vingilot mengisahkan cerita dinamis. Jalankan web dinamis (PHP-FPM) pada hostname app.<xxxx>.com dengan beranda dan halaman about, serta terapkan rewrite sehingga /about berfungsi tanpa akhiran .php. Akses harus dilakukan melalui hostname.
