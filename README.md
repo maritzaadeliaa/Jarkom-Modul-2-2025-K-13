@@ -111,8 +111,7 @@ di Eonwe:
 apt update && apt install -y iptables
 ```
 ```
-iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE -s 10.70.0.
-0/16
+iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE -s 10.70.0.0/16
 ```
 ```
 cat /etc/resolv.conf
