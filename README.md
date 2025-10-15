@@ -175,67 +175,60 @@ echo nameserver 192.168.122.1 > /etc/resolv.conf
 4.	Para penjaga nama naik ke menara, di Tirion (ns1/master) bangun zona <xxxx>.com sebagai authoritative dengan SOA yang menunjuk ke ns1.<xxxx>.com dan catatan NS untuk ns1.<xxxx>.com dan ns2.<xxxx>.com. Buat A record untuk ns1.<xxxx>.com dan ns2.<xxxx>.com yang mengarah ke alamat Tirion dan Valmar sesuai glosarium, serta A record apex <xxxx>.com yang mengarah ke alamat Sirion (front door), aktifkan notify dan allow-transfer ke Valmar, set forwarders ke 192.168.122.1. Di Valmar (ns2/slave) tarik zona <xxxx>.com dari Tirion dan pastikan menjawab authoritative. pada seluruh host non-router ubah urutan resolver menjadi IP dari ns1.<xxxx>.com → ns2.<xxxx>.com → 192.168.122.1. Verifikasi query ke apex dan hostname layanan dalam zona dijawab melalui ns1/ns2.
 
 ### Tirion:
+buat file ```setup_ns1_tirion.sh```
+
 ```bash
+#!/bin/sh
+set -e
+
+# Install BIND
 apt-get update
-apt-get install bind9 -y
-```
+apt-get install -y bind9 dnsutils
 
-```
-ln -s /etc/init.d/named /etc/init.d/bind9
-```
+# symlink init script kalau belum ada
+[ -e /etc/init.d/bind9 ] || ln -s /etc/init.d/named /etc/init.d/bind9 || true
 
-```
-nano /etc/bind/named.conf.local
-```
-Isinya:
-```bash
+# Pastikan direktori zona ada
+mkdir -p /etc/bind/zones
+
+# named.conf.options: listen & forwarders
+cat >/etc/bind/named.conf.options <<'EOF'
+options {
+    directory "/var/cache/bind";
+
+    recursion yes;
+    allow-query { any; };
+
+    listen-on port 53 { any; };
+    listen-on-v6 { any; };
+
+    forwarders { 192.168.122.1; };
+
+    dnssec-validation no;
+    auth-nxdomain no;
+};
+EOF
+
+# named.conf.local: definisi zona master K13.com
+cat >/etc/bind/named.conf.local <<'EOF'
 zone "K13.com" {
-        type master;
-        file "/etc/bind/zones/K13.com";
-        allow-transfer { 10.70.3.4; };
-    also-notify { 10.70.3.4; };
+    type master;
+    file "/etc/bind/zones/K13.com";
+    allow-transfer { 10.70.3.4; };   // Valmar (ns2)
+    also-notify   { 10.70.3.4; };
     notify yes;
 };
-```
+EOF
 
-```
-mkdir /etc/bind/zones
-```
-
-```
-nano /etc/bind/zone.template
-```
-isinya:
-```bash
-$TTL    604800          ; Waktu cache default (detik)
-@       IN      SOA     localhost. root.localhost. (
-                        2025100401 ; Serial (format YYYYMMDDXX)
-                        604800     ; Refresh (1 minggu)
-                        86400      ; Retry (1 hari)
-                        2419200    ; Expire (4 minggu)
-                        604800 )   ; Negative Cache TTL
-;
-
-@       IN      NS      localhost.
-@       IN      A       127.0.0.1
-```
-
-```bash
-cp /etc/bind/zone.template /etc/bind/zones/K13.com
-```
-
-```
-nano /etc/bind/zones/K13.com
-```
-ubah localhostnya, nanti akan diganti seperti ini:
-```bash
-$TTL    604800          ; Waktu cache default (detik)
+# File zona forward K13.com (SOA ke ns1, NS ns1 & ns2, A records)
+cat >/etc/bind/zones/K13.com <<'EOF'
+$TTL    604800
 @       IN      SOA     ns1.K13.com. root.K13.com. (
-                        2025100401      ; Serial (format YYYYMMDDXX)
-                        604800          ; Refresh (1 minggu)
-                        86400           ; Retry (1 hari)
-                        2419200         ; Expire (4 minggu)
-                        604800 )        ; Negative Cache TTL
+                        2025100401      ; Serial (YYYYMMDDnn) → NAIKKAN jika mengubah file ini
+                        604800          ; Refresh
+                        86400           ; Retry
+                        2419200         ; Expire
+                        604800 )        ; Neg TTL
 ;
 
 @       IN      NS      ns1.K13.com.
@@ -244,26 +237,27 @@ $TTL    604800          ; Waktu cache default (detik)
 ; A records
 ns1     IN      A       10.70.3.3       ; Tirion (master)
 ns2     IN      A       10.70.3.4       ; Valmar (slave)
-@       IN      A       10.70.3.2       ; Apex mengarah ke Sirion
+@       IN      A       10.70.3.2       ; Apex → Sirion (front door)
+EOF
 
-```
-cek di console tirion
-```
-named-checkconf
-```
+# Cek sintaks
+named-checkconf -z
+named-checkzone K13.com /etc/bind/zones/K13.com
 
-lalu jalankan:
-```
-named-checkzone K13.com /etc/bind/zones/K13.com 
-```
+# Start/Restart named
+pkill named 2>/dev/null || true
+named -c /etc/bind/named.conf
 
-seharusnya akan mengeluarkan output:
-```bash
-zone K13.com/IN: loaded serial 2025100401
-OK
+# Verifikasi cepat
+echo "== dig SOA @ns1 =="
+dig -4 @127.0.0.1 K13.com SOA +noall +answer
+echo "== dig A ns1/ns2/apex =="
+dig -4 @127.0.0.1 ns1.K13.com +short
+dig -4 @127.0.0.1 ns2.K13.com +short
+dig -4 @127.0.0.1 K13.com +short
+
+echo "NS1 (Tirion) ready."
 ```
-
-
 
 ### Valmar:
 
@@ -357,7 +351,11 @@ dig k13.com +noall +answer
 dig ns1.k13.com +noall +answer
 dig ns2.k13.com +noall +answer
 ```
+buat file ```setup_ns2_valmar.sh```
 
+```bash
+
+```
 5.	“Nama memberi arah,” kata Eonwe. Namai semua tokoh (hostname) sesuai glosarium, eonwe, earendil, elwing, cirdan, elrond, maglor, sirion, tirion, valmar, lindon, vingilot, dan verifikasi bahwa setiap host mengenali dan menggunakan hostname tersebut secara system-wide. Buat setiap domain untuk masing masing node sesuai dengan namanya (contoh: eru.<xxxx>.com) dan assign IP masing-masing juga. Lakukan pengecualian untuk node yang bertanggung jawab atas ns1 dan ns2
 
 di semua node (Router juga) kecuali Tirion dan Valmar:
@@ -696,7 +694,7 @@ echo "Selesai konfigurasi untuk $HOSTNAME.$DOMAIN"
 hostname
 
 ```
-Setelah semua jalanin, tes:
+Setelah semua jalanin, bisa di tes dengan:
 ```bash
 ping -c3 ns1.K13.com
 ping -c3 sirion.K13.com
@@ -830,6 +828,63 @@ named-checkzone 3.70.10.in-addr.arpa /etc/bind/zones/db.3.70.10
 service bind9 restart
 service bind9 status
 ```
+
+buat file ```setup_reverse_zone.sh```
+```bash
+#!/bin/sh
+set -e
+
+# Add reverse zone to named.conf.local
+cat >> /etc/bind/named.conf.local <<'EOF'
+
+zone "3.70.10.in-addr.arpa" {
+    type master;
+    file "/etc/bind/zones/db.3.70.10";
+    notify yes;
+    also-notify { 10.70.3.4; };
+    allow-transfer { 10.70.3.4; };
+};
+EOF
+
+# Create reverse zone file
+mkdir -p /etc/bind/zones
+cat > /etc/bind/zones/db.3.70.10 <<'EOF'
+$TTL 604800
+@   IN  SOA ns1.K13.com. root.K13.com. (
+        2025101301 ; Serial
+        3600       ; Refresh
+        1800       ; Retry
+        1209600    ; Expire
+        86400 )    ; Negative Cache TTL
+;
+
+; Name Servers
+@       IN  NS  ns1.K13.com.
+@       IN  NS  ns2.K13.com.
+
+; PTR Records
+2   IN  PTR  sirion.K13.com.
+5   IN  PTR  lindon.K13.com.
+6   IN  PTR  vingilot.K13.com.
+3   IN  PTR  ns1.K13.com.
+4   IN  PTR  ns2.K13.com.
+EOF
+
+# Check zone syntax
+named-checkzone 3.70.10.in-addr.arpa /etc/bind/zones/db.3.70.10
+
+# Restart BIND
+pkill named 2>/dev/null || true
+named -c /etc/bind/named.conf
+
+# Verify reverse lookup
+dig @127.0.0.1 -x 10.70.3.2 +short
+dig @127.0.0.1 -x 10.70.3.5 +short
+dig @127.0.0.1 -x 10.70.3.6 +short
+
+echo "Reverse zone setup completed"
+```
+
 ### Konfigurasi di Valmar (ns2 / slave)
 Tambahkan zona slave di /etc/bind/named.conf.local
 ```bash
