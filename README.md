@@ -258,7 +258,10 @@ dig -4 @127.0.0.1 K13.com +short
 
 echo "NS1 (Tirion) ready."
 ```
-
+lalu jalankan dengan:
+```bash
+bash setup_ns1_tirion.sh
+```
 ### Valmar:
 
 ```bash
@@ -315,11 +318,6 @@ zone "K13.com" {
 };
 
 ```
-di Tirion:
-```bash
-service bind9 restart || (pkill named 2>/dev/null || true; named -c /etc/bind/named.conf)
-```
-di Valmar:
 ```bash
 pkill named 2>/dev/null || true
 named -c /etc/bind/named.conf
@@ -332,24 +330,33 @@ dig @127.0.0.1 K13.com +noall +answer +aa
 harusnya muncul:
 ```
 K13.com.                604800  IN      A       10.70.3.2
-
 ```
 
 ### Ke semua client non router
 
+buat file ```setup_client.sh```
 ```bash
-echo "nameserver 10.70.3.3" > /etc/resolv.conf
-echo "nameserver 10.70.3.4" >> /etc/resolv.conf
-echo "nameserver 192.168.122.1" >> /etc/resolv.conf
+#!/bin/sh
 
-```
-```
+# Script untuk mengkonfigurasi nameserver dan test dasar
+
+echo "Mengkonfigurasi nameserver..."
+cat > /etc/resolv.conf << EOF
+nameserver 10.70.3.3
+nameserver 10.70.3.4
+nameserver 192.168.122.1
+EOF
+
+echo "Konfigurasi nameserver berhasil:"
 cat /etc/resolv.conf
-```
-```
+
+echo ""
+echo "Test resolusi DNS..."
 dig k13.com +noall +answer
 dig ns1.k13.com +noall +answer
-dig ns2.k13.com +noall +answer
+dig ns2.k13.com +noall +answer
+
+
 ```
 buat file ```setup_ns2_valmar.sh```
 
@@ -362,14 +369,13 @@ di semua node (Router juga) kecuali Tirion dan Valmar:
 
 buat file sh
 ```
-nano /root/setup_node.sh 
+nano setup_node.sh 
 ```
 isi file sesuai dengan nodenya
 
 Jalankan:
 ```bash
-chmod +x /root/setup_node.sh
-bash /root/setup_node.sh
+bash setup_node.sh
 
 ```
 isi file untuk tiap node
@@ -714,7 +720,7 @@ lalu cek serial-nya di Tirion dan Valmar:
 ```
 dig @127.0.0.1 K13.com SOA +noall +answer
 ```
-Contoh Outputnya:
+Outputnya:
 ```
 K13.com.                604800  IN      SOA     ns1.K13.com. root.K13.com. 2025100401 604800 86400 2419200 604800
 ```
@@ -726,15 +732,36 @@ K13.com.                604800  IN      SOA     ns1.K13.com. root.K13.com. 20251
 Verifikasi dari dua klien berbeda bahwa seluruh hostname tersebut ter-resolve ke tujuan yang benar dan konsisten.
 
 Tirion:
-```
-nano /etc/bind/zones/K13.com
-```
-Tambahkan bagian berikut di bawah A records:
+
+buat file ```update_zone_tirion.sh```
 ```bash
+#!/bin/sh
+
+# Script untuk update zone file K13.com dan restart BIND
+
+echo "Mengupdate zone file K13.com..."
+
+# Backup zone file terlebih dahulu
+cp /etc/bind/zones/K13.com /etc/bind/zones/K13.com.backup.$(date +%Y%m%d_%H%M%S)
+
+# Update zone file - pertahankan struktur awal dan tambahkan records baru
+cat > /etc/bind/zones/K13.com << 'EOF'
+$TTL    604800
+@       IN      SOA     ns1.K13.com. root.K13.com. (
+                        2025100402      ; Serial (YYYYMMDDnn) - Dinaikkan
+                        604800          ; Refresh
+                        86400           ; Retry
+                        2419200         ; Expire
+                        604800 )        ; Neg TTL
+;
+
+@       IN      NS      ns1.K13.com.
+@       IN      NS      ns2.K13.com.
+
 ; A records
-ns1     IN A 10.70.3.3       ; Tirion (master)
-ns2     IN A 10.70.3.4       ; Valmar (slave)
-@       IN A 10.70.3.2       ; Apex mengarah ke Sirion
+ns1     IN      A       10.70.3.3       ; Tirion (master)
+ns2     IN      A       10.70.3.4       ; Valmar (slave)
+@       IN      A       10.70.3.2       ; Apex mengarah ke Sirion (front door)
 
 ; Tambahan untuk web & gateway
 sirion  IN A 10.70.3.2       ; Sirion (gateway / gerbang)
@@ -745,12 +772,33 @@ vingilot IN A 10.70.3.6      ; Vingilot (web dinamis)
 www     IN CNAME sirion.K13.com.
 static  IN CNAME lindon.K13.com.
 app     IN CNAME vingilot.K13.com.
+EOF
 
+echo "Zone file berhasil diupdate"
+
+echo "Mengecek konfigurasi zone file..."
+named-checkzone K13.com /etc/bind/zones/K13.com
+
+if [ $? -eq 0 ]; then
+    echo "Zone file valid, melakukan restart BIND..."
+    
+    # Stop BIND jika sedang berjalan
+    pkill named 2>/dev/null || true
+    sleep 2
+    
+    # Start BIND
+    named -c /etc/bind/named.conf
+    
+    echo "BIND berhasil di-restart"
+    echo "Serial number telah dinaikkan menjadi: 2025100402"
+else
+    echo "ERROR: Zone file tidak valid, periksa kembali konfigurasi"
+    exit 1
+fi
 ```
-Naikkan 1 angka terakhir di baris serial SOA:
-```2025100401  →  2025100402```
+### Valmar:
 
-Restart Bind di Tirion dan Valmar
+Restart Bind di Valmar
 ```bash
 pkill named 2>/dev/null || true
 named -c /etc/bind/named.conf
@@ -788,46 +836,6 @@ vingilot.K13.com.
 8.	Setiap jejak harus bisa diikuti. Di Tirion (ns1) deklarasikan satu reverse zone untuk segmen DMZ tempat Sirion, Lindon, Vingilot berada. Di Valmar (ns2) tarik reverse zone tersebut sebagai slave, isi PTR untuk ketiga hostname itu agar pencarian balik IP address mengembalikan hostname yang benar, lalu pastikan query reverse untuk alamat Sirion, Lindon, Vingilot dijawab authoritative.
 
 ### Konfigurasi di Tirion (ns1 / master)
-Deklarasi reverse zone di /etc/bind/named.conf.local
-Tambahkan di bawah zona K13.com:
-```bash
-zone "3.70.10.in-addr.arpa" {
-    type master;
-    file "/etc/bind/zones/db.3.70.10";
-    notify yes;
-    also-notify { 10.70.3.4; };
-    allow-transfer { 10.70.3.4; };
-};
-```
-
-lalu Buat file zona reverse /etc/bind/zones/db.3.70.10
-```bash
-$TTL 604800
-@   IN  SOA ns1.K13.com. root.K13.com. (
-        2025101301 ; Serial
-        3600       ; Refresh
-        1800       ; Retry
-        1209600    ; Expire
-        86400 )    ; Negative Cache TTL
-;
-
-; Name Servers
-@       IN  NS  ns1.K13.com.
-@       IN  NS  ns2.K13.com.
-
-; PTR Records
-2   IN  PTR  Sirion.K13.com.
-5   IN  PTR  Lindon.K13.com.
-6   IN  PTR  Vingilot.K13.com.
-3   IN  PTR  ns1.K13.com.
-4   IN  PTR  ns2.K13.com.
-```
-Cek & reload BIND
-```bash
-named-checkzone 3.70.10.in-addr.arpa /etc/bind/zones/db.3.70.10
-service bind9 restart
-service bind9 status
-```
 
 buat file ```setup_reverse_zone.sh```
 ```bash
@@ -884,9 +892,49 @@ dig @127.0.0.1 -x 10.70.3.6 +short
 
 echo "Reverse zone setup completed"
 ```
+Deklarasi reverse zone di /etc/bind/named.conf.local
+Tambahkan di bawah zona K13.com:
+```bash
+zone "3.70.10.in-addr.arpa" {
+    type master;
+    file "/etc/bind/zones/db.3.70.10";
+    notify yes;
+    also-notify { 10.70.3.4; };
+    allow-transfer { 10.70.3.4; };
+};
+```
+
+lalu Buat file zona reverse /etc/bind/zones/db.3.70.10
+```bash
+$TTL 604800
+@   IN  SOA ns1.K13.com. root.K13.com. (
+        2025101301 ; Serial
+        3600       ; Refresh
+        1800       ; Retry
+        1209600    ; Expire
+        86400 )    ; Negative Cache TTL
+;
+
+; Name Servers
+@       IN  NS  ns1.K13.com.
+@       IN  NS  ns2.K13.com.
+
+; PTR Records
+2   IN  PTR  Sirion.K13.com.
+5   IN  PTR  Lindon.K13.com.
+6   IN  PTR  Vingilot.K13.com.
+3   IN  PTR  ns1.K13.com.
+4   IN  PTR  ns2.K13.com.
+```
+Cek & reload BIND
+```bash
+named-checkzone 3.70.10.in-addr.arpa /etc/bind/zones/db.3.70.10
+service bind9 restart
+service bind9 status
+```
 
 ### Konfigurasi di Valmar (ns2 / slave)
-Tambahkan zona slave di /etc/bind/named.conf.local
+Tambahkan zona slave di ```/etc/bind/named.conf.local```
 ```bash
 zone "3.70.10.in-addr.arpa" {
     type slave;
@@ -932,44 +980,328 @@ dig -4 @10.70.3.4 K13.com SOA +short
 
 ### Lindon
 
-install Apache2
-```
-apt-get update
-apt-get install apache2 -y
-
-```
-Buat folder untuk web statis
-```
-mkdir -p /var/www/static.K13.com/annals
-```
-Isi folder /annals/ dengan file dummy (buat testing dulu):
+buat file ```setup_web_static.sh```
 ```bash
-echo "<h2>Arsip Sejarah Lindon</h2>" > /var/www/static.K13.com/annals/index.html
-echo "catatan1.txt" > /var/www/static.K13.com/annals/catatan1.txt
-echo "catatan2.txt" > /var/www/static.K13.com/annals/catatan2.txt
+#!/bin/sh
+
+# Script untuk setup web statis di Lindon dengan NGINX
+# Hostname: static.K13.com | Folder: /annals/ dengan autoindex
+
+echo "Setup web statis di Lindon dengan NGINX..."
+
+echo "1. Install Nginx..."
+apt update
+apt install nginx -y
+
+echo "2. Membuat direktori /annals/ dan contoh file..."
+mkdir -p /annals
+cat > /annals/index.html << 'EOF'
+<html>
+<head><title>Directory Listing - /annals/</title></head>
+<body>
+<h1>Arsip Annals Lindon</h1>
+<p>Directory listing aktif</p>
+</body>
+</html>
+EOF
+
+echo "Sejarah Kuno Lampion" > /annals/sejarah_kuno.txt
+echo "Catatan Perang Masa Lalu" > /annals/catatan_perang.txt
+echo "Arsip Kerajaan Tua" > /annals/arsip_kerajaan.txt
+echo "Dokumen Lampion" > /annals/lampion.txt
+
+# Set permissions
+chown -R www-data:www-data /annals
+chmod -R 755 /annals
+
+echo "3. Setup virtual host static.K13.com..."
+cat > /etc/nginx/sites-available/static.K13.com << 'EOF'
+server {
+    listen 80;
+    server_name static.K13.com;
+
+    root /var/www/html;
+    index index.html index.htm;
+
+    # Autoindex untuk /annals/
+    location /annals/ {
+        alias /annals/;
+        autoindex on;
+        autoindex_exact_size off;
+        autoindex_localtime on;
+    }
+}
+EOF
+
+echo "4. Buat default page..."
+cat > /var/www/html/index.html << 'EOF'
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Lindon - Static Web</title>
+</head>
+<body>
+    <h1>Lampion Lindon Menyala</h1>
+    <p>Web statis berhasil dijalankan di Lindon</p>
+    <p><a href="/annals/">Telusuri Arsip /annals/</a></p>
+</body>
+</html>
+EOF
+
+echo "5. Enable site dan restart Nginx..."
+ln -sf /etc/nginx/sites-available/static.K13.com /etc/nginx/sites-enabled/
+
+# Hapus default site jika ada
+rm -f /etc/nginx/sites-enabled/default
+
+# Test konfigurasi
+nginx -t
+
+# Restart Nginx menggunakan service (SysV init)
+service nginx restart
+/etc/init.d/nginx restart
+
+echo "6. Verifikasi setup..."
+echo "Cek status Nginx:"
+service nginx status || /etc/init.d/nginx status || ps aux | grep nginx | grep -v grep
+
+echo ""
+echo "Test koneksi web:"
+curl -s -H "Host: static.K13.com" http://127.0.0.1/ | grep -o "<title>.*</title>"
+
+echo ""
+echo "Test directory listing:"
+curl -s -H "Host: static.K13.com" http://127.0.0.1/annals/ | grep -o "<title>.*</title>"
+
+echo ""
+echo "Setup selesai!"
+echo "Akses: http://static.K13.com"
+echo "Arsip: http://static.K13.com/annals/"
 ```
-Buat konfigurasi Virtual Host
-```
-nano /etc/apache2/sites-available/static.K13.com.conf
-```
-isinya:
+
+lalu pergi ke link tersebut
+
+10.	Vingilot mengisahkan cerita dinamis. Jalankan web dinamis (PHP-FPM) pada hostname app.<xxxx>.com dengan beranda dan halaman about, serta terapkan rewrite sehingga /about berfungsi tanpa akhiran .php. Akses harus dilakukan melalui hostname.
+
+### Vingilot
+
+buat file ```setup_web_dinamis.sh```
 ```bash
-<VirtualHost *:80>
-    ServerAdmin webmaster@K13.com
-    ServerName static.K13.com
-    ServerAlias www.static.K13.com
+#!/bin/sh
 
-    DocumentRoot /var/www/static.K13.com
+# Script setup web dinamis PHP-FPM untuk Vingilot
+# Disesuaikan dengan Modul Komdat Jarkom
 
-    <Directory /var/www/static.K13.com/annals>
-        Options +Indexes
-        AllowOverride All
-        Require all granted
-    </Directory>
+echo "=== SETUP WEB DINAMIS VINGILOT ==="
 
-    ErrorLog ${APACHE_LOG_DIR}/static_error.log
-    CustomLog ${APACHE_LOG_DIR}/static_access.log combined
-</VirtualHost>
+echo "1. Install paket yang diperlukan..."
+apt update
+apt install nginx php-fpm php-cli -y
+
+echo "2. Buat struktur direktori web..."
+mkdir -p /var/www/app.K13.com/public_html
+chown -R www-data:www-data /var/www/app.K13.com
+
+echo "3. Buat file PHP untuk halaman beranda dan about..."
+# File index.php (beranda)
+cat > /var/www/app.K13.com/public_html/index.php << 'EOF'
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vingilot - Web Dinamis</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; background: #f0f0f0; }
+        .container { max-width: 800px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+        h1 { color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 10px; }
+        nav { background: #34495e; padding: 15px; border-radius: 5px; margin: 20px 0; }
+        nav a { color: white; text-decoration: none; margin: 0 15px; font-weight: bold; }
+        nav a:hover { color: #3498db; }
+        .info { background: #e8f4fc; padding: 15px; border-radius: 5px; margin: 15px 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Vingilot - Web Dinamis</h1>
+        <div class="info">
+            <p><strong>Selamat datang di Vingilot!</strong> Ini adalah halaman beranda yang di-generate secara dinamis menggunakan PHP.</p>
+        </div>
+        
+        <nav>
+            <a href="/">Beranda</a>
+            <a href="/about">Tentang</a>
+            <a href="/about.php">About (.php)</a>
+        </nav>
+
+        <h2>Informasi Server</h2>
+        <ul>
+            <li>Waktu Server: <strong><?php echo date('d F Y H:i:s'); ?></strong></li>
+            <li>Alamat Client: <strong><?php echo $_SERVER['REMOTE_ADDR']; ?></strong></li>
+            <li>User Agent: <strong><?php echo $_SERVER['HTTP_USER_AGENT'] ?? 'Tidak terdeteksi'; ?></strong></li>
+            <li>Versi PHP: <strong><?php echo phpversion(); ?></strong></li>
+        </ul>
+
+        <h2>Testing PHP</h2>
+        <p>Hasil perhitungan 15 × 27 = <strong><?php echo 15 * 27; ?></strong></p>
+        <p>Tanggal acak: <strong><?php 
+            $dates = ['2024-01-15', '2024-03-22', '2024-07-08', '2024-11-30'];
+            echo $dates[array_rand($dates)];
+        ?></strong></p>
+    </div>
+</body>
+</html>
+EOF
+
+# File about.php
+cat > /var/www/app.K13.com/public_html/about.php << 'EOF'
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tentang - Vingilot</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; background: #f0f0f0; }
+        .container { max-width: 800px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+        h1 { color: #2c3e50; border-bottom: 2px solid #e74c3c; padding-bottom: 10px; }
+        nav { background: #34495e; padding: 15px; border-radius: 5px; margin: 20px 0; }
+        nav a { color: white; text-decoration: none; margin: 0 15px; font-weight: bold; }
+        nav a:hover { color: #3498db; }
+        .history { background: #fff8e1; padding: 15px; border-radius: 5px; margin: 15px 0; border-left: 4px solid #ffc107; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Tentang Vingilot</h1>
+        
+        <nav>
+            <a href="/">Beranda</a>
+            <a href="/about">Tentang</a>
+            <a href="/about.php">About (.php)</a>
+        </nav>
+
+        <div class="history">
+            <h2>Sejarah Vingilot</h2>
+            <p>Vingilot adalah kapal legendaris dalam cerita-cerita kuno yang mengarungi lautan dinamis. Dalam konteks ini, Vingilot mewakili server web dinamis yang menangani request PHP.</p>
+        </div>
+
+        <h2>Informasi Teknis</h2>
+        <ul>
+            <li>Server Software: <strong><?php echo $_SERVER['SERVER_SOFTWARE']; ?></strong></li>
+            <li>Metode Request: <strong><?php echo $_SERVER['REQUEST_METHOD']; ?></strong></li>
+            <li>Script Name: <strong><?php echo $_SERVER['SCRIPT_NAME']; ?></strong></li>
+            <li>Timestamp: <strong><?php echo time(); ?></strong> (Unix timestamp)</li>
+        </ul>
+
+        <h2>Konfigurasi PHP</h2>
+        <ul>
+            <li>Memory Limit: <strong><?php echo ini_get('memory_limit'); ?></strong></li>
+            <li>Max Execution Time: <strong><?php echo ini_get('max_execution_time'); ?> detik</strong></li>
+            <li>Post Max Size: <strong><?php echo ini_get('post_max_size'); ?></strong></li>
+        </ul>
+
+        <h2>Demo Fitur PHP</h2>
+        <p>Nilai acak antara 1-100: <strong><?php echo rand(1, 100); ?></strong></p>
+        <p>Hash MD5 dari "vingilot": <strong><?php echo md5('vingilot'); ?></strong></p>
+        <p>Array contoh: 
+            <strong><?php 
+                $buah = ['Apel', 'Jeruk', 'Mangga', 'Pisang'];
+                echo implode(', ', $buah);
+            ?></strong>
+        </p>
+    </div>
+</body>
+</html>
+EOF
+
+echo "4. Konfigurasi Nginx virtual host..."
+cat > /etc/nginx/sites-available/app.K13.com << 'EOF'
+server {
+    listen 80;
+    server_name app.K13.com;
+    
+    root /var/www/app.K13.com/public_html;
+    index index.php index.html index.htm;
+
+    # Rewrite rule untuk clean URL /about
+    location = /about {
+        try_files $uri /about.php;
+    }
+
+    # Handle PHP files
+    location ~ \.php$ {
+        include snippets/fastcgi-php.conf;
+        
+        # Coba berbagai kemungkinan socket PHP-FPM
+        fastcgi_pass unix:/var/run/php/php8.1-fpm.sock;
+        try_files $uri =404;
+        
+        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+        include fastcgi_params;
+    }
+
+    # Deny access to sensitive files
+    location ~ /\.(ht|git) {
+        deny all;
+    }
+
+    # Logging
+    access_log /var/log/nginx/app.K13.com.access.log;
+    error_log /var/log/nginx/app.K13.com.error.log;
+}
+EOF
+
+echo "5. Deteksi dan sesuaikan PHP-FPM socket..."
+# Cek socket PHP-FPM yang tersedia
+if [ -S /var/run/php/php8.1-fpm.sock ]; then
+    PHP_SOCKET="unix:/var/run/php/php8.1-fpm.sock"
+elif [ -S /var/run/php/php8.0-fpm.sock ]; then
+    PHP_SOCKET="unix:/var/run/php/php8.0-fpm.sock"
+elif [ -S /var/run/php/php7.4-fpm.sock ]; then
+    PHP_SOCKET="unix:/var/run/php/php7.4-fpm.sock"
+else
+    # Fallback ke socket yang umum
+    PHP_SOCKET="unix:/var/run/php/php-fpm.sock"
+fi
+
+echo "Menggunakan PHP-FPM socket: $PHP_SOCKET"
+sed -i "s|fastcgi_pass unix:/var/run/php/php8.1-fpm.sock;|fastcgi_pass $PHP_SOCKET;|g" /etc/nginx/sites-available/app.K13.com
+
+echo "6. Enable site dan restart services..."
+ln -sf /etc/nginx/sites-available/app.K13.com /etc/nginx/sites-enabled/
+rm -f /etc/nginx/sites-enabled/default
+
+# Test konfigurasi Nginx
+echo "Testing konfigurasi Nginx..."
+nginx -t
+
+# Restart services menggunakan service command
+echo "Restarting services..."
+service nginx restart
+
+# Restart PHP-FPM menggunakan service command
+service php8.1-fpm restart 2>/dev/null || service php8.0-fpm restart 2>/dev/null || service php7.4-fpm restart 2>/dev/null || service php-fpm restart
+
+echo "7. Verifikasi setup..."
+echo "Menunggu services startup..."
+sleep 3
+
+echo "Testing PHP processing..."
+curl -s -H "Host: app.K13.com" http://127.0.0.1/index.php | grep -q "Vingilot" && echo "OK - Beranda PHP berhasil" || echo "ERROR - Beranda gagal"
+
+echo "Testing rewrite /about..."
+curl -s -H "Host: app.K13.com" http://127.0.0.1/about | grep -q "Tentang Vingilot" && echo "OK - Rewrite /about berhasil" || echo "ERROR - Rewrite gagal"
+
+echo "Testing direct PHP access..."
+curl -s -H "Host: app.K13.com" http://127.0.0.1/about.php | grep -q "Informasi Teknis" && echo "OK - Direct PHP berhasil" || echo "ERROR - Direct PHP gagal"
+
+echo ""
+echo "SETUP SELESAI!"
+echo "========================"
+echo "Beranda:    http://app.K13.com"
+echo "About:      http://app.K13.com/about"
+echo "About PHP:  http://app.K13.com/about.php"
 ```
 
 Soal 11 - 20
@@ -1218,8 +1550,5 @@ havens  IN CNAME www.K13.com.
 
 lalu verifikasi 
 
-
-
-10.	Vingilot mengisahkan cerita dinamis. Jalankan web dinamis (PHP-FPM) pada hostname app.<xxxx>.com dengan beranda dan halaman about, serta terapkan rewrite sehingga /about berfungsi tanpa akhiran .php. Akses harus dilakukan melalui hostname.
 
 
