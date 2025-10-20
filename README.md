@@ -7,6 +7,9 @@
 
 Soal 1 - 10
 1.	Di tepi Beleriand yang porak-poranda, Eonwe merentangkan tiga jalur: Barat untuk Earendil dan Elwing, Timur untuk Círdan, Elrond, Maglor, serta pelabuhan DMZ bagi Sirion, Tirion, Valmar, Lindon, Vingilot. Tetapkan alamat dan default gateway tiap tokoh sesuai glosarium yang sudah diberikan.
+
+   ![Soal_1](assets/soal1.jpg)
+   
 ```bash
 Eonwe:
 
@@ -333,6 +336,8 @@ K13.com.                604800  IN      A       10.70.3.2
 ```
 
 ### Ke semua client non router
+
+![setup_client](assets/setup_client.jpg)
 
 buat file ```setup_client.sh```
 ```bash
@@ -733,6 +738,8 @@ Verifikasi dari dua klien berbeda bahwa seluruh hostname tersebut ter-resolve ke
 
 Tirion:
 
+![update_zone_tirion](assets/update_zone_tirion.jpg)
+
 buat file ```update_zone_tirion.sh```
 ```bash
 #!/bin/sh
@@ -836,6 +843,8 @@ vingilot.K13.com.
 8.	Setiap jejak harus bisa diikuti. Di Tirion (ns1) deklarasikan satu reverse zone untuk segmen DMZ tempat Sirion, Lindon, Vingilot berada. Di Valmar (ns2) tarik reverse zone tersebut sebagai slave, isi PTR untuk ketiga hostname itu agar pencarian balik IP address mengembalikan hostname yang benar, lalu pastikan query reverse untuk alamat Sirion, Lindon, Vingilot dijawab authoritative.
 
 ### Konfigurasi di Tirion (ns1 / master)
+
+![setup_reverse_zone](assets/setup_reverse_zone.jpg)
 
 buat file ```setup_reverse_zone.sh```
 ```bash
@@ -979,7 +988,7 @@ dig -4 @10.70.3.4 K13.com SOA +short
 9.	Lampion Lindon dinyalakan. Jalankan web statis pada hostname static.<xxxx>.com dan buka folder arsip /annals/ dengan autoindex (directory listing) sehingga isinya dapat ditelusuri. Akses harus dilakukan melalui hostname, bukan IP.
 
 ### Lindon
-
+[!setup_web_static](assets/setup_web_static.jpg)
 buat file ```setup_web_static.sh```
 ```bash
 #!/bin/sh
