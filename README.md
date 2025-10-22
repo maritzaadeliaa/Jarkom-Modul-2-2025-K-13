@@ -114,12 +114,15 @@ gateway 10.70.3.1
 
 2. Angin dari luar mulai berhembus ketika Eonwe membuka jalan ke awan NAT. Pastikan jalur WAN di router aktif dan NAT meneruskan trafik keluar bagi seluruh alamat internal sehingga host di dalam dapat mencapai layanan di luar menggunakan IP address.
 di Eonwe:
+install iptables:
 ```bash
 apt update && apt install -y iptables
 ```
+Menambahkan aturan NAT:
 ```
 iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE -s 10.70.0.0/16
 ```
+cek konfigurasi:
 ```
 cat /etc/resolv.conf
 ```
@@ -128,6 +131,7 @@ di semua node selain router:
 ```bash
 echo nameserver 192.168.122.1 > /etc/resolv.conf
 ```
+uji konektivitas internet:
 ```
 ping google.com
 ```
@@ -202,7 +206,7 @@ options {
     recursion yes;
     allow-query { any; };
 
-    listen-on port 53 { any; };
+    listen-on { any; };
     listen-on-v6 { any; };
 
     forwarders { 192.168.122.1; };
@@ -266,6 +270,7 @@ lalu jalankan dengan:
 bash setup_ns1_tirion.sh
 ```
 ### Valmar:
+Konfigurasi ini membuat BIND bertindak sebagai DNS resolver:
 
 ```bash
 apt-get update
@@ -371,6 +376,8 @@ buat file ```setup_ns2_valmar.sh```
 5.	“Nama memberi arah,” kata Eonwe. Namai semua tokoh (hostname) sesuai glosarium, eonwe, earendil, elwing, cirdan, elrond, maglor, sirion, tirion, valmar, lindon, vingilot, dan verifikasi bahwa setiap host mengenali dan menggunakan hostname tersebut secara system-wide. Buat setiap domain untuk masing masing node sesuai dengan namanya (contoh: eru.<xxxx>.com) dan assign IP masing-masing juga. Lakukan pengecualian untuk node yang bertanggung jawab atas ns1 dan ns2
 
 di semua node (Router juga) kecuali Tirion dan Valmar:
+
+menyetel hostname, file hosts, dan resolver DNS secara otomatis pada tiap node (kecuali Tirion dan Valmar) agar semua perangkat di jaringan bisa saling mengenali lewat domain K13.com.
 
 buat file sh
 ```
@@ -709,7 +716,7 @@ Setelah semua jalanin, bisa di tes dengan:
 ```bash
 ping -c3 ns1.K13.com
 ping -c3 sirion.K13.com
-ping -c3 elrond.K13.com
+ping -c3 earendil.K13.com
 
 ```
 
@@ -901,6 +908,7 @@ dig @127.0.0.1 -x 10.70.3.6 +short
 
 echo "Reverse zone setup completed"
 ```
+
 Deklarasi reverse zone di /etc/bind/named.conf.local
 Tambahkan di bawah zona K13.com:
 ```bash
@@ -944,6 +952,7 @@ service bind9 status
 
 ### Konfigurasi di Valmar (ns2 / slave)
 Tambahkan zona slave di ```/etc/bind/named.conf.local```
+
 ```bash
 zone "3.70.10.in-addr.arpa" {
     type slave;
