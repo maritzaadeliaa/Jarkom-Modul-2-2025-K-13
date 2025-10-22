@@ -854,7 +854,8 @@ lindon.K13.com.
 vingilot.K13.com.
 10.70.3.6
 ```
-
+ ![Soal7](assets/dig-elwing.png)
+ 
 8.	Setiap jejak harus bisa diikuti. Di Tirion (ns1) deklarasikan satu reverse zone untuk segmen DMZ tempat Sirion, Lindon, Vingilot berada. Di Valmar (ns2) tarik reverse zone tersebut sebagai slave, isi PTR untuk ketiga hostname itu agar pencarian balik IP address mengembalikan hostname yang benar, lalu pastikan query reverse untuk alamat Sirion, Lindon, Vingilot dijawab authoritative.
 
 ### Konfigurasi di Tirion (ns1 / master)
