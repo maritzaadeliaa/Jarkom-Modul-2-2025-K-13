@@ -182,6 +182,9 @@ echo nameserver 192.168.122.1 > /etc/resolv.conf
 4.	Para penjaga nama naik ke menara, di Tirion (ns1/master) bangun zona <xxxx>.com sebagai authoritative dengan SOA yang menunjuk ke ns1.<xxxx>.com dan catatan NS untuk ns1.<xxxx>.com dan ns2.<xxxx>.com. Buat A record untuk ns1.<xxxx>.com dan ns2.<xxxx>.com yang mengarah ke alamat Tirion dan Valmar sesuai glosarium, serta A record apex <xxxx>.com yang mengarah ke alamat Sirion (front door), aktifkan notify dan allow-transfer ke Valmar, set forwarders ke 192.168.122.1. Di Valmar (ns2/slave) tarik zona <xxxx>.com dari Tirion dan pastikan menjawab authoritative. pada seluruh host non-router ubah urutan resolver menjadi IP dari ns1.<xxxx>.com → ns2.<xxxx>.com → 192.168.122.1. Verifikasi query ke apex dan hostname layanan dalam zona dijawab melalui ns1/ns2.
 
 ### Tirion:
+
+![soal4-tir](assets/soal4-tir.jpg)
+
 buat file ```setup_ns1_tirion.sh```
 
 ```bash
@@ -270,6 +273,9 @@ lalu jalankan dengan:
 bash setup_ns1_tirion.sh
 ```
 ### Valmar:
+
+![soal4-val](assets/soal4-val.jpg)
+
 Konfigurasi ini membuat BIND bertindak sebagai DNS resolver:
 
 ```bash
@@ -376,6 +382,8 @@ buat file ```setup_ns2_valmar.sh```
 5.	“Nama memberi arah,” kata Eonwe. Namai semua tokoh (hostname) sesuai glosarium, eonwe, earendil, elwing, cirdan, elrond, maglor, sirion, tirion, valmar, lindon, vingilot, dan verifikasi bahwa setiap host mengenali dan menggunakan hostname tersebut secara system-wide. Buat setiap domain untuk masing masing node sesuai dengan namanya (contoh: eru.<xxxx>.com) dan assign IP masing-masing juga. Lakukan pengecualian untuk node yang bertanggung jawab atas ns1 dan ns2
 
 di semua node (Router juga) kecuali Tirion dan Valmar:
+
+![soal5-sh](assets/soal5-sh.jpg)
 
 menyetel hostname, file hosts, dan resolver DNS secara otomatis pada tiap node (kecuali Tirion dan Valmar) agar semua perangkat di jaringan bisa saling mengenali lewat domain K13.com.
 
@@ -997,7 +1005,7 @@ dig -4 @10.70.3.4 K13.com SOA +short
 9.	Lampion Lindon dinyalakan. Jalankan web statis pada hostname static.<xxxx>.com dan buka folder arsip /annals/ dengan autoindex (directory listing) sehingga isinya dapat ditelusuri. Akses harus dilakukan melalui hostname, bukan IP.
 
 ### Lindon
-[!setup_web_static](assets/setup_web_static.jpg)
+![setup_web_static](assets/setup_web_static.jpg)
 buat file ```setup_web_static.sh```
 ```bash
 #!/bin/sh
