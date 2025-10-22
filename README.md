@@ -183,7 +183,7 @@ echo nameserver 192.168.122.1 > /etc/resolv.conf
 
 ### Tirion:
 
-![soal4-tir](assets/soal_4-tirion.jpg)
+![soal4-tir](assets/soal_4-tirion.png)
 
 buat file ```setup_ns1_tirion.sh```
 
