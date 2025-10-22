@@ -183,7 +183,7 @@ echo nameserver 192.168.122.1 > /etc/resolv.conf
 
 ### Tirion:
 
-![soal4-tir](assets/soal4-tir.jpg)
+![soal4-tir](assets/soal_4-tirion.jpg)
 
 buat file ```setup_ns1_tirion.sh```
 
@@ -374,16 +374,12 @@ dig ns2.k13.com +noall +answer
 
 
 ```
-buat file ```setup_ns2_valmar.sh```
 
-```bash
-
-```
 5.	“Nama memberi arah,” kata Eonwe. Namai semua tokoh (hostname) sesuai glosarium, eonwe, earendil, elwing, cirdan, elrond, maglor, sirion, tirion, valmar, lindon, vingilot, dan verifikasi bahwa setiap host mengenali dan menggunakan hostname tersebut secara system-wide. Buat setiap domain untuk masing masing node sesuai dengan namanya (contoh: eru.<xxxx>.com) dan assign IP masing-masing juga. Lakukan pengecualian untuk node yang bertanggung jawab atas ns1 dan ns2
 
 di semua node (Router juga) kecuali Tirion dan Valmar:
 
-![soal5-sh](assets/soal5-sh.jpg)
+![soal5-sh](assets/setup_node.png)
 
 menyetel hostname, file hosts, dan resolver DNS secara otomatis pada tiap node (kecuali Tirion dan Valmar) agar semua perangkat di jaringan bisa saling mengenali lewat domain K13.com.
 
@@ -1006,7 +1002,9 @@ dig -4 @10.70.3.4 K13.com SOA +short
 9.	Lampion Lindon dinyalakan. Jalankan web statis pada hostname static.<xxxx>.com dan buka folder arsip /annals/ dengan autoindex (directory listing) sehingga isinya dapat ditelusuri. Akses harus dilakukan melalui hostname, bukan IP.
 
 ### Lindon
+
 ![setup_web_static](assets/setup_web_static.jpg)
+
 buat file ```setup_web_static.sh```
 ```bash
 #!/bin/sh
